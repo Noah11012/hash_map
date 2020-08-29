@@ -13,25 +13,25 @@ int main(void) {
     Map *name_to_age;
     map_init(name_to_age, int);
 
-    map_insert(map, "John", INT_TO_ANY(22));
-    map_insert(map, "Susan", INT_TO_ANY(24));
-    map_insert(map, "Mary", INT_TO_ANY(25));
+    map_insert(name_to_age, "John", INT_TO_ANY(22));
+    map_insert(name_to_age, "Susan", INT_TO_ANY(24));
+    map_insert(name_to_age, "Mary", INT_TO_ANY(25));
 
     // Get the values
     int mary_age;
-    map_get(map, "Mary", &mary_age);
+    map_get(name_to_age, "Mary", &mary_age);
 
     printf("Mary's age is %d\n", mary_age);
 
     // If a mapping exists already then this will modify the value
-    map_insert(map, "Mary", INT_TO_ANY(30));
-    map_get(map, "Mary", &mary_age);
+    map_insert(name_to_age, "Mary", INT_TO_ANY(30));
+    map_get(name_to_age, "Mary", &mary_age);
 
     printf("Mary's age is now %d\n", mary_age);
 
-    map_pretty_print(map); // For debugging purposes
+    map_pretty_print(name_to_age); // For debugging purposes
 
-    map_delete(map);
+    map_delete(name_to_age);
 }
 ```
 
