@@ -3,66 +3,43 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define string_equal(string1, string2) (!strncmp(string1, string2, strlen(string1)))
-
-typedef struct Chain_Node Chain_Node;
-struct Chain_Node {
+typedef struct Bucket {
     char const *key;
     Any value;
-    Chain_Node *next;
-};
+    bool in_use;
+    
+    /* These are only used when this bucket is a "collision node" */
+    struct Bucket *collision_head;
+    struct Bucket *next;
+} Bucket;
 
-typedef struct Map_Node Map_Node;
-struct Map_Node {
-    char const *key;
-    Any value;
-    int in_use;
-    Map_Node *next;
-    Chain_Node *chain_head;
-};
+Bucket *bucket_node_new(char const *key) {
+    Bucket *bucket = malloc(sizeof *bucket);
+    if (!bucket)
+        return NULLPTR;
+
+    bucket->key = key;
+    bucket->value = NULLPTR;
+    bucket->in_use = false;
+    bucket->next = NULLPTR;
+    
+    return bucket;
+}
 
 struct Map {
-    Map_Node *head;
-    Map_Node *tail;
+    Bucket *bucket_list;
+    int bucket_list_count;
+    int bucket_list_capacity;
     int value_size;
-    int node_count;
-    int used_node_count;
+
+    /* Only used when iterating */
+    int iter_count;
+    int iter_position;
+    bool in_collision_nodes;
+    Bucket *current_collision_node;
 };
 
-static Map_Node *get_node(Map_Node *head, size_t index) {
-    Map_Node *iter = head;
-    for (size_t i = 0; i < index; i++) {
-        iter = iter->next;
-    }
-
-    return iter;
-}
-
-static Map_Node *map_node_new(void) {
-    Map_Node *node = malloc(sizeof *node);
-    if (!node)
-        return NULLPTR;
-
-    node->key = NULLPTR;
-    node->value = ANY_NULL;
-    node->in_use = 0;
-    node->next = NULLPTR;
-    node->chain_head = NULLPTR;
-
-    return node;
-}
-
-static Chain_Node *chain_node_new(char const *key, Any value) {
-    Chain_Node *node = malloc(sizeof *node);
-    if (!node)
-        return NULLPTR;
-
-    node->key = key;
-    node->value = value;
-    node->next = NULLPTR;
-
-    return node;
-}
+#define string_equal(string1, string2) (!strcmp(string1, string2))
 
 /* Laughably bad hash function */
 static size_t hash_function(char const *key) {
@@ -80,132 +57,156 @@ static size_t hash_function(char const *key) {
     return result;
 }
 
-static void free_all_map_nodes(Map_Node *head) {
-    Map_Node *iter = head;
-    while (1) {
-        if (!iter)
-            break;
+#define INITIAL_CAPACITY 32
 
-        Map_Node *next_node = iter->next;
-        free(iter->value);
-        free(iter);
-        iter = next_node;
-    }
-}
-
-#define INITIAL_NODE_COUNT 32
-
-Map_Status_Code map_init_(Map **mapp, int value_size) {
-    *mapp = malloc(sizeof **mapp);
-    Map *map = *mapp;
-    map->head = map_node_new();
-    if (!map->head)
-        return MAP_OOM;
-
-    Map_Status_Code status = MAP_OK;
-    Map_Node *iter = map->head;
-    Map_Node *prev_iter = NULLPTR;
-    for (int i = 1; i < INITIAL_NODE_COUNT; i++) {
-        prev_iter = iter;
-        iter = iter->next;
-        iter = map_node_new();
-        prev_iter->next = iter;
-        if (!iter) {
-            free_all_map_nodes(map->head);
-            status = MAP_OOM;
-            break;
-        }
-    }
-
-    map->tail = iter;
-    map->tail->next = NULLPTR;
+bool map_init_(Map **mapp, int value_size) {
+    Map *map = malloc(sizeof *map);
+    map->bucket_list = calloc(INITIAL_CAPACITY, sizeof(Bucket));
+    if (!map->bucket_list)
+        return false;
+    map->bucket_list_count = 0;
+    map->bucket_list_capacity = INITIAL_CAPACITY;
     map->value_size = value_size;
-    map->node_count = INITIAL_NODE_COUNT;
-    map->used_node_count = 0;
 
-    return status;
+    *mapp = map;
+
+    return true;
 }
 
 void map_delete(Map *map) {
-    free_all_map_nodes(map->head);
+    free(map->bucket_list);
     free(map);
 }
 
-Map_Status_Code map_insert(Map *map, char const *key, Any value) {
-    size_t index = hash_function(key) % map->node_count;
-    Map_Node *node = get_node(map->head, index);
-    Map_Status_Code status = MAP_OK;
-    if (!node->in_use) {
-        node->key = key;
-        node->value = malloc(map->value_size);
-        memcpy(node->value, value, map->value_size);
-        node->in_use = 1;
-        map->used_node_count++;
+void map_insert(Map *map, char const *key, Any value) {
+    size_t index = hash_function(key) % map->bucket_list_capacity;
+    Bucket *bucket = map->bucket_list + index;
+    if (!bucket->in_use) {
+        bucket->key = key;
+        bucket->value = malloc(map->value_size);
+        memcpy(bucket->value, value, map->value_size);
+        bucket->in_use = true;
+        map->bucket_list_count++;
     } else {
-        if (string_equal(key, node->key)) {
-            memcpy(node->value, value, map->value_size);
-        } else {
-            if (!node->chain_head) {
-                node->chain_head = malloc(sizeof *node->chain_head);
-                if (!node->chain_head)
-                    status = MAP_OOM;
-            }
-
-            Chain_Node *iter = node->chain_head;
-            Chain_Node *prev_iter = NULLPTR;
-            while (1)  {
-                if (!iter)
-                    break;
-
-                prev_iter = iter;
-                iter = iter->next;
-            }
-
-            iter = prev_iter;
-            iter->next = chain_node_new(key, value);
-            if (!iter->next)
-                status = MAP_OOM;
+        if (string_equal(key, bucket->key)) {
+            memcpy(bucket->value, value, map->value_size);
+            return;
         }
-    }
 
-    return status;
+        if (!bucket->collision_head)
+            bucket->collision_head = bucket_node_new(key);
+        if (!bucket->collision_head)
+            return;
+
+        Bucket *iter = bucket->collision_head;
+        while (1) {
+            if (!iter->next)
+                break;
+        }
+
+        Bucket *bucket_to_use = iter;
+        if (bucket_to_use->in_use) {
+            bucket_to_use = bucket_node_new(key);
+            iter->next = bucket_to_use;
+        }
+
+        bucket_to_use->value = malloc(map->value_size);
+        memcpy(bucket_to_use, value, map->value_size);
+        bucket_to_use->in_use = true;
+        map->bucket_list_count++;
+    }
 }
 
-Map_Status_Code map_get(Map *map, char const *key, Any output_value) {
-    Map_Status_Code status = MAP_OK;
-    size_t index = hash_function(key) % map->node_count;
-    Map_Node *node = get_node(map->head, index);
-    if (node->in_use) {
-        if (string_equal(key, node->key)) {
-            memcpy(output_value, node->value, map->value_size);
-        } else {
-            status = MAP_NOTFOUND;
-            for (Chain_Node *iter = node->chain_head; iter; iter = iter->next) {
-                if (string_equal(key, iter->key)) {
-                    status = MAP_OK;
-                    memcpy(output_value, node->value, map->value_size);
-                    break;
-                }
+Any map_get(Map *map, char const *key) {
+    size_t index = hash_function(key) % map->bucket_list_capacity;
+    Bucket *bucket = map->bucket_list + index;
+    if (bucket->in_use) {
+        if (string_equal(key, bucket->key))
+            return bucket->value;
+    }
+
+    Any value = NULLPTR;
+    if (bucket->collision_head) {
+        Bucket *iter = bucket->collision_head;
+        while (1) {
+            if (!iter)
+                break;
+
+            if (string_equal(key, iter->key)) {
+                value = iter->value;
+                break;
             }
+
+            iter = iter->next;
         }
     }
 
-    return status;
+    return value;
+}
+
+Map_Iter map_iter_begin(Map *map) {
+    map->iter_count = 0;
+    map->iter_position = 0;
+    map->in_collision_nodes = false;
+    return map_iter_next(map);
+}
+
+Map_Iter map_iter_next(Map *map) {
+    Map_Iter result = { NULLPTR, ANY_NULL };
+
+    if (map->iter_count < map->bucket_list_count) {
+        while (map->iter_position < map->bucket_list_capacity) {
+            if (map->in_collision_nodes) {
+                if (map->current_collision_node->in_use) {
+                    result.key = map->current_collision_node->key;
+                    result.value = map->current_collision_node->value;
+                    map->iter_count++;
+                }
+
+                map->current_collision_node = map->current_collision_node->next;
+                if (!map->current_collision_node)
+                    map->in_collision_nodes = false;
+                break;
+            }
+
+            Bucket *bucket = map->bucket_list + map->iter_position++;
+            if (bucket->in_use) {
+                result.key = bucket->key;
+                result.value = bucket->value;
+                map->iter_count++;
+            }
+
+            if (bucket->collision_head) {
+                map->in_collision_nodes = true;
+                map->current_collision_node = bucket->collision_head;
+            }
+
+            if (map_iter_is_valid(result))
+                break;
+        }
+    }
+
+    return result;
+}
+
+bool map_iter_is_valid(Map_Iter iter) {
+    return iter.key != NULLPTR && iter.value != ANY_NULL;
 }
 
 #include <stdio.h>
 void map_pretty_print(Map *map) {
-    Map_Node *iter = map->head;
-    while (1) {
-        if (!iter)
-            break;
+    for (int i = 0; i < map->bucket_list_capacity; i++) {
+        Bucket *bucket = map->bucket_list + i;
+        for (Bucket *iter = bucket->collision_head; iter; iter = iter->next) {
+            printf("\t{ key: %s, value: %p, in_use: %s }\n",
+                   bucket->key,
+                   bucket->value,
+                   bucket->in_use ? "true" : "false");
+        }
 
-        printf("{ key: %s, value: %p, in_use: %s, next: %p }\n",
-               iter->key,
-               iter->value,
-               (iter->in_use ? "true" : "false"),
-               iter->next);
-
-        iter = iter->next;
+        printf("{ key: %s, value: %p, in_use: %s }\n",
+               bucket->key,
+               bucket->value,
+               bucket->in_use ? "true" : "false");
     }
 }
