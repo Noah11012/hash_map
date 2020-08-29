@@ -1,5 +1,8 @@
 ## Hash Map Library
 
+Mainly this library was created for my educational purposes and should not be used in anyone's code base.
+Of course you may use the library for your own learning purposes or use this as a template for your own hash map implementation.
+
 Example code:
 
 ```c
