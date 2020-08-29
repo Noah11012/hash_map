@@ -24,7 +24,7 @@ int main(void) {
     printf("Mary's age is %d\n", mary_age);
 
     // If a mapping exists already then this will modify the value
-    map_insert(map, "Mary", 30);
+    map_insert(map, "Mary", INT_TO_ANY(30));
     map_get(map, "Mary", &mary_age);
 
     printf("Mary's age is now %d\n", mary_age);
