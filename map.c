@@ -9,8 +9,9 @@ typedef struct Bucket {
     bool in_use;
     struct Bucket *collision_head;
 
-    /* This is only used when this bucket is a "collision node" */
+    /* These are only used when this bucket is a "collision node" */
     struct Bucket *next;
+    struct Bucket *last_collision_node;
 } Bucket;
 
 Bucket *bucket_node_new(void) {
@@ -36,7 +37,6 @@ struct Map {
     bool locked;
 
     /* Only used when iterating */
-    int iter_count;
     int iter_position;
     bool in_collision_nodes;
     Bucket *current_collision_node;
@@ -125,25 +125,16 @@ void map_insert(Map *map, char const *key, Any value) {
             return;
         }
 
-        Bucket *iter = bucket->collision_head;
-        if (iter) {
-            while (1) {
-                if (!iter->next)
-                    break;
-
-                iter = iter->next;
-            }
-        }
-
         Bucket *next_collision_node = bucket_node_new();
         next_collision_node->key = key;
         next_collision_node->value = malloc(map->value_size);
         memcpy(next_collision_node->value, value, map->value_size);
         next_collision_node->in_use = true;
         if (bucket->collision_head)
-            iter->next = next_collision_node;
+            bucket->last_collision_node->next = next_collision_node;
         else
             bucket->collision_head = next_collision_node;
+        bucket->last_collision_node = next_collision_node;
         map->load_factor += 0.1f;
         map->bucket_list_count++;
     }
@@ -205,7 +196,6 @@ void map_remove(Map *map, char const *key) {
 }
 
 Map_Iter map_iter_begin(Map *map) {
-    map->iter_count = 0;
     map->iter_position = 0;
     map->in_collision_nodes = false;
     map->locked = true;
@@ -214,37 +204,32 @@ Map_Iter map_iter_begin(Map *map) {
 
 Map_Iter map_iter_next(Map *map) {
     Map_Iter result = { NULLPTR, ANY_NULL };
-
-    if (map->iter_count < map->bucket_list_count) {
-        while (map->iter_position < map->bucket_list_capacity) {
-            if (map->in_collision_nodes) {
-                if (map->current_collision_node->in_use) {
-                    result.key = map->current_collision_node->key;
-                    result.value = map->current_collision_node->value;
-                    map->iter_count++;
-                }
-
-                map->current_collision_node = map->current_collision_node->next;
-                if (!map->current_collision_node)
-                    map->in_collision_nodes = false;
-                break;
+    while (map->iter_position < map->bucket_list_capacity) {
+        if (map->in_collision_nodes) {
+            if (map->current_collision_node->in_use) {
+                result.key = map->current_collision_node->key;
+                result.value = map->current_collision_node->value;
             }
 
-            Bucket *bucket = map->bucket_list + map->iter_position++;
-            if (bucket->in_use) {
-                result.key = bucket->key;
-                result.value = bucket->value;
-                map->iter_count++;
-            }
-
-            if (bucket->collision_head) {
-                map->in_collision_nodes = true;
-                map->current_collision_node = bucket->collision_head;
-            }
-
-            if (map_iter_is_valid(result))
-                break;
+            map->current_collision_node = map->current_collision_node->next;
+            if (!map->current_collision_node)
+                map->in_collision_nodes = false;
+            break;
         }
+
+        Bucket *bucket = map->bucket_list + map->iter_position++;
+        if (bucket->in_use) {
+            result.key = bucket->key;
+            result.value = bucket->value;
+        }
+
+        if (bucket->collision_head) {
+            map->in_collision_nodes = true;
+            map->current_collision_node = bucket->collision_head;
+        }
+
+        if (map_iter_is_valid(result))
+            break;
     }
 
     if (!map_iter_is_valid(result))
