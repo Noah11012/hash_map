@@ -76,6 +76,22 @@ bool map_init_(Map **mapp, int value_size) {
 }
 
 void map_delete(Map *map) {
+    for (int i = 0; i < map->bucket_list_capacity; i++) {
+        Bucket *bucket = map->bucket_list + i;
+        if (bucket->value) {
+            free(bucket->value);
+        }
+
+        Bucket *collision_node_iter = bucket->collision_head;
+        while (collision_node_iter) {
+            Bucket *next_collision_node = collision_node_iter->next;
+            free(collision_node_iter->value);
+            free(collision_node_iter);
+
+            collision_node_iter = next_collision_node;
+        }
+    }
+
     free(map->bucket_list);
     free(map);
 }
@@ -87,7 +103,7 @@ void map_insert(Map *map, char const *key, Any value) {
             return;
         map->bucket_list_capacity *= 1.5;
         map->bucket_list = new_bucket_list;
-        load_factor = 0.0f;
+        map->load_factor = 0.0f;
     }
 
     size_t index = hash_function(key) % map->bucket_list_capacity;
