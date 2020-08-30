@@ -13,14 +13,15 @@ typedef struct Bucket {
     struct Bucket *next;
 } Bucket;
 
-Bucket *bucket_node_new(char const *key) {
+Bucket *bucket_node_new(void) {
     Bucket *bucket = malloc(sizeof *bucket);
     if (!bucket)
         return NULLPTR;
 
-    bucket->key = key;
+    bucket->key = NULLPTR;
     bucket->value = NULLPTR;
     bucket->in_use = false;
+    bucket->collision_head = NULLPTR;
     bucket->next = NULLPTR;
     
     return bucket;
@@ -124,30 +125,27 @@ void map_insert(Map *map, char const *key, Any value) {
             return;
         }
 
-        if (!bucket->collision_head)
-            bucket->collision_head = bucket_node_new(key);
-        if (!bucket->collision_head)
-            return;
-
         Bucket *iter = bucket->collision_head;
-        while (1) {
-            if (!iter->next)
-                break;
+        if (iter) {
+            while (1) {
+                if (!iter->next)
+                    break;
 
-            iter = iter->next;
+                iter = iter->next;
+            }
         }
 
-        Bucket *bucket_to_use = iter;
-        if (bucket_to_use->in_use) {
-            bucket_to_use = bucket_node_new(key);
-            iter->next = bucket_to_use;
-        }
-
-        bucket_to_use->value = malloc(map->value_size);
-        memcpy(bucket_to_use, value, map->value_size);
-        bucket_to_use->in_use = true;
-        map->bucket_list_count++;
+        Bucket *next_collision_node = bucket_node_new();
+        next_collision_node->key = key;
+        next_collision_node->value = malloc(map->value_size);
+        memcpy(next_collision_node->value, value, map->value_size);
+        next_collision_node->in_use = true;
+        if (bucket->collision_head)
+            iter->next = next_collision_node;
+        else
+            bucket->collision_head = next_collision_node;
         map->load_factor += 0.1f;
+        map->bucket_list_count++;
     }
 }
 
@@ -235,15 +233,16 @@ bool map_iter_is_valid(Map_Iter iter) {
 void map_pretty_print(Map *map) {
     for (int i = 0; i < map->bucket_list_capacity; i++) {
         Bucket *bucket = map->bucket_list + i;
-        for (Bucket *iter = bucket->collision_head; iter; iter = iter->next)
-            printf("\t{ key: %s, value: %p, in_use: %s }\n",
-                   bucket->key,
-                   bucket->value,
-                   bucket->in_use ? "true" : "false");
-
         printf("{ key: %s, value: %p, in_use: %s }\n",
                bucket->key,
                bucket->value,
                bucket->in_use ? "true" : "false");
+
+        for (Bucket *iter = bucket->collision_head; iter; iter = iter->next) {
+            printf("\t⤷ { key: %s, value: %p, in_use: %s }\n",
+                   iter->key,
+                   iter->value,
+                   iter->in_use ? "true" : "false");
+        }
     }
 }
