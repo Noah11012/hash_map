@@ -31,6 +31,7 @@ struct Map {
     int bucket_list_count;
     int bucket_list_capacity;
     int value_size;
+    float load_factor;
 
     /* Only used when iterating */
     int iter_count;
@@ -67,6 +68,7 @@ bool map_init_(Map **mapp, int value_size) {
     map->bucket_list_count = 0;
     map->bucket_list_capacity = INITIAL_CAPACITY;
     map->value_size = value_size;
+    map->load_factor = 0.0f;
 
     *mapp = map;
 
@@ -79,6 +81,14 @@ void map_delete(Map *map) {
 }
 
 void map_insert(Map *map, char const *key, Any value) {
+    if (map->load_factor >= 1.0f) {
+        Bucket *new_bucket_list = realloc(map->bucket_list, map->bucket_list_capacity);
+        if (!new_bucket_list)
+            return;
+        map->bucket_list_capacity *= 1.5;
+        map->bucket_list = new_bucket_list;
+    }
+
     size_t index = hash_function(key) % map->bucket_list_capacity;
     Bucket *bucket = map->bucket_list + index;
     if (!bucket->in_use) {
@@ -116,6 +126,7 @@ void map_insert(Map *map, char const *key, Any value) {
         memcpy(bucket_to_use, value, map->value_size);
         bucket_to_use->in_use = true;
         map->bucket_list_count++;
+        map->load_factor += 0.1f;
     }
 }
 
