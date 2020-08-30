@@ -13,17 +13,22 @@ Example code:
 int main(void) {
     Map *map;
     if (!map_init(map, int)) {
-        printf("failed to create map\n");
+        printf("Failed to create map\n");
         return 1;
     }
 
-    map_insert(map, "John", INT_TO_ANY(25));
-    map_insert(map, "Susan", INT_TO_ANY(30));
-    map_insert(map, "Mary", INT_TO_ANY(35));
+    map_register_new_type(int);
 
-    for (map_iter(map, it)) {
-        printf("key = %s\tvalue = %d\n", it.key, *((int *)it.value));
+    map_insert(map, "John", INT_TO_ANY(25));
+    map_insert(map, "Susan", INT_TO_ANY(28));
+    map_insert(map, "Mary", INT_TO_ANY(24));
+    map_insert(map, "Jessica", INT_TO_ANY(30));
+
+    for(map_iterate(map, it, int)) {
+        printf("key = %s\tvalue = %d\n", it->key, *it->value);
     }
+
+    map_pretty_print(map);
 
     map_delete(map);
 }

@@ -37,6 +37,7 @@ struct Map {
     bool locked;
 
     /* Only used when iterating */
+    Map_Iter iter;
     int iter_position;
     Bucket *current_collision_node; /* If not null then we are currently iterating over the collision nodes */
 };
@@ -198,15 +199,19 @@ void map_remove(Map *map, char const *key) {
     }
 }
 
-Map_Iter map_iter_begin(Map *map) {
+Map_Iter *map_iter_begin(Map *map) {
     map->iter_position = 0;
     map->locked = true;
+    map->iter.key = NULLPTR;
+    map->iter.value = ANY_NULL;
+    map->current_collision_node = NULL;
     return map_iter_next(map);
 }
 
-Map_Iter map_iter_next(Map *map) {
-    Map_Iter result = { NULLPTR, ANY_NULL };
+Map_Iter *map_iter_next(Map *map) {
     Bucket *bucket_to_return = NULLPTR;
+    map->iter.key = NULL;
+    map->iter.value = NULL;
     while (map->iter_position < map->bucket_list_capacity) {
         Bucket *bucket = map->bucket_list + map->iter_position;
 
@@ -231,16 +236,16 @@ Map_Iter map_iter_next(Map *map) {
         }
 
         if (bucket_to_return) {
-            result.key = bucket_to_return->key;
-            result.value = bucket_to_return->value;
+            map->iter.key = bucket_to_return->key;
+            map->iter.value = bucket_to_return->value;
             break;
         }
     }
 
-    if (!map_iter_is_valid(result))
+    if (!map_iter_is_valid(map->iter))
         map->locked = false;
 
-    return result;
+    return &map->iter;
 }
 
 bool map_iter_is_valid(Map_Iter iter) {
