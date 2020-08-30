@@ -171,27 +171,43 @@ void map_remove(Map *map, char const *key) {
     size_t index = hash_function(key) % map->bucket_list_capacity;
     Bucket *bucket = map->bucket_list + index;
     Bucket *bucket_to_remove = NULLPTR;
+    Bucket *previous_node = NULLPTR;
+    Bucket *current_node = NULLPTR;
     bool is_collision_node = false;
     if (bucket->in_use) {
         if (string_equal(key, bucket->key))
             bucket_to_remove = bucket;
+    }
 
-        if (!bucket_to_remove) {
-            for (Bucket *iter = bucket->collision_head; iter; iter = iter->next) {
-                if (iter->in_use) {
-                    if (string_equal(key, iter->key)) {
-                        bucket_to_remove = iter;
-                        is_collision_node = true;
-                        break;
-                    }
-                }
+    /* If the bucket is not the one then search
+       through the collision nodes if it has any */
+    if (!bucket_to_remove && bucket->collision_head) {
+        previous_node = bucket;
+        current_node = bucket->collision_head;
+        while (current_node) {
+            if (string_equal(key, current_node->key)) {
+                bucket_to_remove = current_node;
+                is_collision_node = true;
+                break;
             }
-        }
 
+            previous_node = current_node;
+            current_node = current_node->next;
+        }
+    }
+
+    if (bucket_to_remove) {
         bucket_to_remove->key = NULLPTR;
         free(bucket_to_remove->value);
         bucket_to_remove->value = NULLPTR;
         bucket_to_remove->in_use = false;
+
+        /* Make sure to reconnect any broken collision nodes */
+        if (is_collision_node) {
+            Bucket *next_node = current_node->next;
+            free(current_node);
+            bucket->collision_head = next_node;
+        }
     }
 }
 
