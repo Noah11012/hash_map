@@ -32,6 +32,7 @@ struct Map {
     int bucket_list_capacity;
     int value_size;
     float load_factor;
+    bool locked;
 
     /* Only used when iterating */
     int iter_count;
@@ -69,6 +70,7 @@ bool map_init_(Map **mapp, int value_size) {
     map->bucket_list_capacity = INITIAL_CAPACITY;
     map->value_size = value_size;
     map->load_factor = 0.0f;
+    map->locked = false;
 
     *mapp = map;
 
@@ -97,6 +99,8 @@ void map_delete(Map *map) {
 }
 
 void map_insert(Map *map, char const *key, Any value) {
+    if (map->locked)
+        return;
     if (map->load_factor >= 1.0f) {
         Bucket *new_bucket_list = realloc(map->bucket_list, map->bucket_list_capacity);
         if (!new_bucket_list)
@@ -178,6 +182,7 @@ Map_Iter map_iter_begin(Map *map) {
     map->iter_count = 0;
     map->iter_position = 0;
     map->in_collision_nodes = false;
+    map->locked = true;
     return map_iter_next(map);
 }
 
@@ -215,6 +220,9 @@ Map_Iter map_iter_next(Map *map) {
                 break;
         }
     }
+
+    if (!map_iter_is_valid(result))
+        map->locked = false;
 
     return result;
 }
