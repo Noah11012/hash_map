@@ -17,7 +17,7 @@ int main(void) {
         return 1;
     }
 
-    map_register_new_type(int);
+    map_register_new_type(type);
 
     map_insert(map, "John", INT_TO_ANY(25));
     map_insert(map, "Susan", INT_TO_ANY(28));
