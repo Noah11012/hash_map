@@ -176,6 +176,34 @@ Any map_get(Map *map, char const *key) {
     return value;
 }
 
+void map_remove(Map *map, char const *key) {
+    size_t index = hash_function(key) % map->bucket_list_capacity;
+    Bucket *bucket = map->bucket_list + index;
+    Bucket *bucket_to_remove = NULLPTR;
+    bool is_collision_node = false;
+    if (bucket->in_use) {
+        if (string_equal(key, bucket->key))
+            bucket_to_remove = bucket;
+
+        if (!bucket_to_remove) {
+            for (Bucket *iter = bucket->collision_head; iter; iter = iter->next) {
+                if (iter->in_use) {
+                    if (string_equal(key, iter->key)) {
+                        bucket_to_remove = iter;
+                        is_collision_node = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        bucket_to_remove->key = NULLPTR;
+        free(bucket_to_remove->value);
+        bucket_to_remove->value = NULLPTR;
+        bucket_to_remove->in_use = false;
+    }
+}
+
 Map_Iter map_iter_begin(Map *map) {
     map->iter_count = 0;
     map->iter_position = 0;
