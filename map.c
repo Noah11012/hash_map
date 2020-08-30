@@ -38,8 +38,7 @@ struct Map {
 
     /* Only used when iterating */
     int iter_position;
-    bool in_collision_nodes;
-    Bucket *current_collision_node;
+    Bucket *current_collision_node; /* If not null then we are currently iterating over the collision nodes */
 };
 
 #define string_equal(string1, string2) (!strcmp(string1, string2))
@@ -197,7 +196,6 @@ void map_remove(Map *map, char const *key) {
 
 Map_Iter map_iter_begin(Map *map) {
     map->iter_position = 0;
-    map->in_collision_nodes = false;
     map->locked = true;
     return map_iter_next(map);
 }
@@ -208,12 +206,11 @@ Map_Iter map_iter_next(Map *map) {
     while (map->iter_position < map->bucket_list_capacity) {
         Bucket *bucket = map->bucket_list + map->iter_position;
 
-        if (map->in_collision_nodes) {
+        if (map->current_collision_node) {
             bucket_to_return = map->current_collision_node;
             map->current_collision_node = map->current_collision_node->next;
 
             if (!map->current_collision_node) {
-                map->in_collision_nodes = false;
                 map->current_collision_node = NULLPTR;
                 map->iter_position++;
             }
@@ -222,11 +219,10 @@ Map_Iter map_iter_next(Map *map) {
                 bucket_to_return = bucket;
 
             if (bucket->collision_head) {
-                map->in_collision_nodes = true;
                 map->current_collision_node = bucket->collision_head;
             }
 
-            if (!map->in_collision_nodes)
+            if (!map->current_collision_node)
                 map->iter_position++;
         }
 
