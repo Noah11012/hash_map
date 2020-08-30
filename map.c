@@ -204,32 +204,37 @@ Map_Iter map_iter_begin(Map *map) {
 
 Map_Iter map_iter_next(Map *map) {
     Map_Iter result = { NULLPTR, ANY_NULL };
+    Bucket *bucket_to_return = NULLPTR;
     while (map->iter_position < map->bucket_list_capacity) {
+        Bucket *bucket = map->bucket_list + map->iter_position;
+
         if (map->in_collision_nodes) {
-            if (map->current_collision_node->in_use) {
-                result.key = map->current_collision_node->key;
-                result.value = map->current_collision_node->value;
+            bucket_to_return = map->current_collision_node;
+            map->current_collision_node = map->current_collision_node->next;
+
+            if (!map->current_collision_node) {
+                map->in_collision_nodes = false;
+                map->current_collision_node = NULLPTR;
+                map->iter_position++;
+            }
+        } else {
+            if (bucket->in_use)
+                bucket_to_return = bucket;
+
+            if (bucket->collision_head) {
+                map->in_collision_nodes = true;
+                map->current_collision_node = bucket->collision_head;
             }
 
-            map->current_collision_node = map->current_collision_node->next;
-            if (!map->current_collision_node)
-                map->in_collision_nodes = false;
+            if (!map->in_collision_nodes)
+                map->iter_position++;
+        }
+
+        if (bucket_to_return) {
+            result.key = bucket_to_return->key;
+            result.value = bucket_to_return->value;
             break;
         }
-
-        Bucket *bucket = map->bucket_list + map->iter_position++;
-        if (bucket->in_use) {
-            result.key = bucket->key;
-            result.value = bucket->value;
-        }
-
-        if (bucket->collision_head) {
-            map->in_collision_nodes = true;
-            map->current_collision_node = bucket->collision_head;
-        }
-
-        if (map_iter_is_valid(result))
-            break;
     }
 
     if (!map_iter_is_valid(result))
