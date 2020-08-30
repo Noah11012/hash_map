@@ -204,8 +204,8 @@ void map_remove(Map *map, char const *key) {
 
         /* Make sure to reconnect any broken collision nodes */
         if (is_collision_node) {
-            Bucket *next_node = current_node->next;
-            free(current_node);
+            Bucket *next_node = bucket_to_remove->next;
+            free(bucket_to_remove);
             bucket->collision_head = next_node;
         }
     }
