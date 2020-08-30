@@ -143,7 +143,11 @@ Any map_get(Map *map, char const *key) {
     size_t index = hash_function(key) % map->bucket_list_capacity;
     Bucket *bucket = map->bucket_list + index;
     if (bucket->in_use) {
-        if (string_equal(key, bucket->key))
+        bool return_now = true;
+        if (bucket->collision_head)
+            return_now = string_equal(key, bucket->key);
+
+        if (return_now)
             return bucket->value;
     }
 
