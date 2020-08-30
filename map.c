@@ -51,10 +51,11 @@ static size_t hash_function(char const *key) {
         result += key[i];
         /* I have no idea what this does. Just doing random stuff */
         result ^= -(1 - (key[i] - 2));
-        result ^= -(1 - (key[i] - 4));
+        result &= -(1 - (key[i] - 4));
         result ^= -(1 - (key[i] - 8));
-        result ^= -(1 - (key[i] - 16));
+        result &= -(1 - (key[i] - 16));
         result ^= -(1 - (key[i] - 32));
+        result &= -(1 - (key[i] - 64));
     }
 
     return result;
