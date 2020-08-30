@@ -7,9 +7,9 @@ typedef struct Bucket {
     char const *key;
     Any value;
     bool in_use;
-    
-    /* These are only used when this bucket is a "collision node" */
     struct Bucket *collision_head;
+
+    /* This is only used when this bucket is a "collision node" */
     struct Bucket *next;
 } Bucket;
 
@@ -102,6 +102,8 @@ void map_insert(Map *map, char const *key, Any value) {
         while (1) {
             if (!iter->next)
                 break;
+
+            iter = iter->next;
         }
 
         Bucket *bucket_to_use = iter;
@@ -125,7 +127,7 @@ Any map_get(Map *map, char const *key) {
             return bucket->value;
     }
 
-    Any value = NULLPTR;
+    Any value = ANY_NULL;
     if (bucket->collision_head) {
         Bucket *iter = bucket->collision_head;
         while (1) {
@@ -197,12 +199,11 @@ bool map_iter_is_valid(Map_Iter iter) {
 void map_pretty_print(Map *map) {
     for (int i = 0; i < map->bucket_list_capacity; i++) {
         Bucket *bucket = map->bucket_list + i;
-        for (Bucket *iter = bucket->collision_head; iter; iter = iter->next) {
+        for (Bucket *iter = bucket->collision_head; iter; iter = iter->next)
             printf("\t{ key: %s, value: %p, in_use: %s }\n",
                    bucket->key,
                    bucket->value,
                    bucket->in_use ? "true" : "false");
-        }
 
         printf("{ key: %s, value: %p, in_use: %s }\n",
                bucket->key,
