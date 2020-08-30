@@ -87,6 +87,7 @@ void map_insert(Map *map, char const *key, Any value) {
             return;
         map->bucket_list_capacity *= 1.5;
         map->bucket_list = new_bucket_list;
+        load_factor = 0.0f;
     }
 
     size_t index = hash_function(key) % map->bucket_list_capacity;
