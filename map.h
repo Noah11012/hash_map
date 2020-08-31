@@ -32,6 +32,7 @@ bool map_init_(Map **mapp, int value_size);
 #define map_init(map, type) map_init_(&map, sizeof(type))
 void map_delete(Map *map);
 void map_insert(Map *map, char const *key, Any value);
+void map_insert_array(Map *, char const *key, Any array, int count);
 Any map_get(Map *map, char const *key);
 void map_remove(Map *map, char const *key);
 void map_pretty_print(Map *map);

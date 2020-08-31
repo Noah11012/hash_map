@@ -6,6 +6,7 @@
 typedef struct Bucket {
     char const *key;
     Any value;
+    bool is_array;
     bool in_use;
     struct Bucket *collision_head;
 
@@ -21,6 +22,7 @@ Bucket *bucket_node_new(void) {
 
     bucket->key = NULLPTR;
     bucket->value = NULLPTR;
+    bucket->is_array = false;
     bucket->in_use = false;
     bucket->collision_head = NULLPTR;
     bucket->next = NULLPTR;
@@ -100,45 +102,57 @@ void map_delete(Map *map) {
     free(map);
 }
 
-void map_insert(Map *map, char const *key, Any value) {
-    if (map->locked)
-        return;
-    if (map->load_factor >= 1.0f) {
-        Bucket *new_bucket_list = realloc(map->bucket_list, map->bucket_list_capacity);
-        if (!new_bucket_list)
-            return;
-        map->bucket_list_capacity *= 1.5;
-        map->bucket_list = new_bucket_list;
-        map->load_factor = 0.0f;
-    }
-
+static Bucket *map_find_free_bucket(Map *map, char const *key) {
     size_t index = hash_function(key) % map->bucket_list_capacity;
     Bucket *bucket = map->bucket_list + index;
-    if (!bucket->in_use) {
-        bucket->key = key;
-        bucket->value = malloc(map->value_size);
-        memcpy(bucket->value, value, map->value_size);
-        bucket->in_use = true;
-        map->bucket_list_count++;
-    } else {
-        if (string_equal(key, bucket->key)) {
-            memcpy(bucket->value, value, map->value_size);
-            return;
-        }
-
+    if (bucket->in_use) {
         Bucket *next_collision_node = bucket_node_new();
-        next_collision_node->key = key;
-        next_collision_node->value = malloc(map->value_size);
-        memcpy(next_collision_node->value, value, map->value_size);
-        next_collision_node->in_use = true;
         if (bucket->collision_head)
             bucket->last_collision_node->next = next_collision_node;
         else
             bucket->collision_head = next_collision_node;
         bucket->last_collision_node = next_collision_node;
+        bucket = next_collision_node;
         map->load_factor += 0.1f;
-        map->bucket_list_count++;
     }
+
+    map->bucket_list_count++;
+
+    return bucket;
+}
+
+static void map_reallocate_buckets_if_needed(Map *map) {
+    if (map->load_factor >= 1.0f) {
+        Bucket *new_bucket_list = realloc(map->bucket_list, map->bucket_list_capacity);
+        map->bucket_list_capacity *= 1.5;
+        map->bucket_list = new_bucket_list;
+        map->load_factor = 0.0f;
+    }
+}
+
+void map_insert(Map *map, char const *key, Any value) {
+    if (map->locked)
+        return;
+
+    map_reallocate_buckets_if_needed(map);
+    Bucket *bucket = map_find_free_bucket(map, key);
+    bucket->key = key;
+    bucket->value = malloc(map->value_size);
+    memcpy(bucket->value, value, map->value_size);
+    bucket->in_use = true;
+}
+
+void map_insert_array(Map *map, char const *key, Any array, int count) {
+    if (map->locked)
+        return;
+
+    map_reallocate_buckets_if_needed(map);
+    Bucket *bucket = map_find_free_bucket(map, key);
+    bucket->key = key;
+    bucket->value = malloc(map->value_size * count);
+    memcpy(bucket->value, array, map->value_size * count);
+    bucket->in_use = true;
+    bucket->is_array = true;
 }
 
 Any map_get(Map *map, char const *key) {
@@ -202,6 +216,7 @@ void map_remove(Map *map, char const *key) {
         free(bucket_to_remove->value);
         bucket_to_remove->value = NULLPTR;
         bucket_to_remove->in_use = false;
+        bucket_to_remove->is_array = false;
 
         /* Make sure to reconnect any broken collision nodes */
         if (is_collision_node) {
@@ -269,16 +284,18 @@ bool map_iter_is_valid(Map_Iter *iter) {
 void map_pretty_print(Map *map) {
     for (int i = 0; i < map->bucket_list_capacity; i++) {
         Bucket *bucket = map->bucket_list + i;
-        printf("{ key: %s, value: %p, in_use: %s }\n",
+        printf("{ key: %s, value: %p, in_use: %s, is_array: %s }\n",
                bucket->key,
                bucket->value,
-               bucket->in_use ? "true" : "false");
+               bucket->in_use ? "true" : "false",
+               bucket->is_array ? "true" : "false");
 
         for (Bucket *iter = bucket->collision_head; iter; iter = iter->next) {
-            printf("\t⤷ { key: %s, value: %p, in_use: %s }\n",
+            printf("\t⤷ { key: %s, value: %p, in_use: %s, is_array: %s }\n",
                    iter->key,
                    iter->value,
-                   iter->in_use ? "true" : "false");
+                   iter->in_use ? "true" : "false",
+                   iter->is_array ? "true" : "false");
         }
     }
 }
