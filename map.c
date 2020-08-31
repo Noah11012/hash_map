@@ -255,14 +255,14 @@ Map_Iter *map_iter_next(Map *map) {
         }
     }
 
-    if (!map_iter_is_valid(map->iter))
+    if (!map_iter_is_valid(&map->iter))
         map->locked = false;
 
     return &map->iter;
 }
 
-bool map_iter_is_valid(Map_Iter iter) {
-    return iter.key != NULLPTR && iter.value != ANY_NULL;
+bool map_iter_is_valid(Map_Iter *iter) {
+    return iter->key != NULLPTR && iter->value != ANY_NULL;
 }
 
 #include <stdio.h>

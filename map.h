@@ -21,12 +21,12 @@ typedef struct {
 
 #define map_iterate(map, variable_name, type) \
     Map_Iter_##type *variable_name = (Map_Iter_##type *)map_iter_begin(map); \
-    map_iter_is_valid(*((Map_Iter *)variable_name)); \
+    map_iter_is_valid((Map_Iter *)variable_name); \
     variable_name = (Map_Iter_##type *)map_iter_next(map) \
 
 Map_Iter *map_iter_begin(Map *map);
 Map_Iter *map_iter_next(Map *map);
-bool map_iter_is_valid(Map_Iter iter);
+bool map_iter_is_valid(Map_Iter *iter);
 
 bool map_init_(Map **mapp, int value_size);
 #define map_init(map, type) map_init_(&map, sizeof(type))
