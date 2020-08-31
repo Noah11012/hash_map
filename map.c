@@ -146,7 +146,7 @@ void map_insert(Map *map, char const *key, Any value) {
     bucket->count = 0;
 }
 
-void map_insert_array_(Map *map, char const *key, Any array, int count) {
+void map_insert_array(Map *map, char const *key, Any array, int count) {
     if (map->locked)
         return;
 
