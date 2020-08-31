@@ -7,6 +7,7 @@ typedef struct Bucket {
     char const *key;
     Any value;
     bool is_array;
+    int count;
     bool in_use;
     struct Bucket *collision_head;
 
@@ -23,6 +24,7 @@ Bucket *bucket_node_new(void) {
     bucket->key = NULLPTR;
     bucket->value = NULLPTR;
     bucket->is_array = false;
+    bucket->count = 0;
     bucket->in_use = false;
     bucket->collision_head = NULLPTR;
     bucket->next = NULLPTR;
@@ -140,6 +142,8 @@ void map_insert(Map *map, char const *key, Any value) {
     bucket->value = malloc(map->value_size);
     memcpy(bucket->value, value, map->value_size);
     bucket->in_use = true;
+    bucket->is_array = false;
+    bucket->count = 0;
 }
 
 void map_insert_array(Map *map, char const *key, Any array, int count) {
@@ -153,6 +157,7 @@ void map_insert_array(Map *map, char const *key, Any array, int count) {
     memcpy(bucket->value, array, map->value_size * count);
     bucket->in_use = true;
     bucket->is_array = true;
+    bucket->count = count;
 }
 
 Any map_get(Map *map, char const *key) {
@@ -217,6 +222,7 @@ void map_remove(Map *map, char const *key) {
         bucket_to_remove->value = NULLPTR;
         bucket_to_remove->in_use = false;
         bucket_to_remove->is_array = false;
+        bucket_to_remove->count = 0;
 
         /* Make sure to reconnect any broken collision nodes */
         if (is_collision_node) {
@@ -266,6 +272,10 @@ Map_Iter *map_iter_next(Map *map) {
         if (bucket_to_return) {
             map->iter.key = bucket_to_return->key;
             map->iter.value = bucket_to_return->value;
+            map->iter.is_array = bucket_to_return->is_array;
+            if (map->iter.is_array) {
+                map->iter.count = bucket_to_return->count;
+            }
             break;
         }
     }

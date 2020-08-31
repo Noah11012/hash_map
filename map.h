@@ -1,22 +1,27 @@
+#include <stdbool.h>
+#include <stddef.h>
+
 typedef void* Any;
 typedef struct Map Map;
 
 typedef struct {
     char const *key;
     Any value;
+    bool is_array;
+    int count;
 } Map_Iter;
 
 #define map_register_new_type(type) \
     typedef struct { \
         char const *key; \
         type *value; \
+        bool is_array; \
+        int count; \
     } Map_Iter_##type \
 
 #define ANY_NULL ((void *) 0)
 #define NULLPTR  ((void *) 0)
 
-#include <stddef.h>
-#include <stdbool.h>
 #define INT_TO_ANY(number) (&(int){ number })
 
 #define map_iterate(map, variable_name, type) \
