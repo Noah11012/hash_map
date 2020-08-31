@@ -24,7 +24,7 @@ int main(void) {
     map_insert(map, "Mary", INT_TO_ANY(24));
     map_insert(map, "Jessica", INT_TO_ANY(30));
 
-    for(map_iterate(map, it, int)) {
+    for (map_iterate(map, it, int)) {
         printf("key = %s\tvalue = %d\n", it->key, *it->value);
     }
 
