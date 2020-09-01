@@ -198,8 +198,6 @@ Any map_get(Map *map, char const *key) {
 }
 
 void map_remove(Map *map, char const *key) {
-    if (map->locked)
-        return;
     size_t index = hash_function(key) % map->bucket_list_capacity;
     Bucket *bucket = map->bucket_list + index;
     Bucket *bucket_to_remove = NULLPTR;
