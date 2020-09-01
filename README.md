@@ -29,6 +29,9 @@ int main(void) {
     int *age_of_john = map_get(map, "John");
     printf("The age of john is %d\n", *age_of_john);
 
+    int array[] = { 1, 2, 3 };
+    map_insert_array(map, "An Array", array, 3);
+
     for (map_iterate(map, it, int)) {
         printf("key = %s\tvalue = %d\n", it->key, *it->value);
 
@@ -42,6 +45,15 @@ int main(void) {
                will become invalidated. Otherwise the iterator
                should be fine. */
             map_remove(map, it->key);
+        }
+
+        /* You can use the is_array flag to distinguish between
+           non arrays and arrays */
+        if (it->is_array) {
+            printf("Printing array\n");
+            /* it->count is valid if it->is_array == true. */
+            for (int i = 0; i < it->count; i++)
+                printf("it->value[%d] = %d\n", i, it->value[i]);
         }
     }
 
