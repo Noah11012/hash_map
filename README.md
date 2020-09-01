@@ -44,8 +44,10 @@ int main(void) {
         }
 
         if (it->key[0] == 'J') {
-            /* Always assume when calling map_remove() that iterator
-               the has become invalidated. */
+            /* You can remove elements while iterating.
+               Always assume when removing elements inside
+               of a map_iterate loop that the iterator
+               will become invalidated. */
             map_remove(map, it->key);
         }
 
