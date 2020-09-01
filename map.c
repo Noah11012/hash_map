@@ -247,6 +247,31 @@ void map_remove(Map *map, char const *key) {
     }
 }
 
+void map_clear(Map *map) {
+    for (int i = 0; i < map->bucket_list_capacity; i++) {
+        Bucket *bucket = map->bucket_list + i;
+        if (bucket->in_use) {
+            free(bucket->key);
+            bucket->key = NULLPTR;
+            free(bucket->value);
+            bucket->value = ANY_NULL;
+            bucket->in_use = false;
+            bucket->is_array = false;
+            bucket->count = 0;
+        }
+
+        for (Bucket *collision_node = bucket->collision_head; collision_node;) {
+            Bucket *next_node = collision_node->next;
+            free(collision_node->key);
+            free(collision_node->value);
+            free(collision_node);
+            collision_node = next_node;
+        }
+
+        bucket->collision_head = NULLPTR;
+    }
+}
+
 Map_Iter *map_iter_begin(Map *map) {
     map->iter_position = 0;
     map->locked = true;

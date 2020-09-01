@@ -40,4 +40,5 @@ void map_insert(Map *map, char const *key, Any value);
 void map_insert_array(Map *map, char const *key, Any value, int count);
 Any map_get(Map *map, char const *key);
 void map_remove(Map *map, char const *key);
+void map_clear(Map *map);
 void map_pretty_print(Map *map);
