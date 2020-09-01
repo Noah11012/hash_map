@@ -26,7 +26,7 @@ typedef struct Bucket {
     struct Bucket *last_collision_node;
 } Bucket;
 
-Bucket *bucket_node_new(void) {
+static Bucket *bucket_node_new(void) {
     Bucket *bucket = malloc(sizeof *bucket);
     if (!bucket)
         return NULLPTR;
