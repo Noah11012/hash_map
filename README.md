@@ -17,10 +17,6 @@ int main(void) {
         return 1;
     }
 
-    /* This is only needed if you plan to use map_iterate().
-       Never call this macro twice with the same type. */
-    map_register_new_type(int);
-
     map_insert(map, "John", INT_TO_ANY(25));
     map_insert(map, "Susan", INT_TO_ANY(28));
     map_insert(map, "Mary", INT_TO_ANY(24));
@@ -32,20 +28,9 @@ int main(void) {
     int array[] = { 1, 2, 3 };
     map_insert_array(map, "An Array", array, 3);
 
-    for (map_iterate(map, it, int)) {
-        printf("key = %s\tvalue = %d\n", it->key, *it->value);
-
+    for (map_iterate(map, it)) {
         /* Insertion while iterating over the map is not allowed. */
         map_insert(map, "Ian", INT_TO_ANY(26));
-
-        if (it->key[0] == 'J') {
-            /* Removing elements is allowed during iteration.
-               If you pass it->key to map_remove() or pass in a key
-               that so happens to be the same as it->key then the iterator
-               will become invalidated. Otherwise the iterator
-               should be fine. */
-            map_remove(map, it->key);
-        }
 
         /* You can use the is_array flag to distinguish between
            non arrays and arrays */
@@ -53,8 +38,17 @@ int main(void) {
             printf("Printing array\n");
             /* it->count is valid if it->is_array == true. */
             for (int i = 0; i < it->count; i++)
-                printf("it->value[%d] = %d\n", i, it->value[i]);
+                printf("it->value[%d] = %d\n", i, ((int *)it->value)[i]);
+        } else {
+            printf("key = %s\tvalue = %d\n", it->key, *(int *)it->value);
         }
+
+        if (it->key[0] == 'J') {
+            /* Always assume when calling map_remove() that iterator
+               the has become invalidated. */
+            map_remove(map, it->key);
+        }
+
     }
 
     /* Can be used to debug problems with your map. */
