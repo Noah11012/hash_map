@@ -3,8 +3,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+static char *string_duplicate(char const *string) {
+    int length_of_string = strlen(string);
+    char *result = malloc(length_of_string + 1);
+    if (!result)
+        return NULLPTR;
+
+    memcpy(result, string, length_of_string + 1);
+    return result;
+}
+
 typedef struct Bucket {
-    char const *key;
+    char *key;
     Any value;
     bool is_array;
     int count;
@@ -87,12 +97,14 @@ void map_delete(Map *map) {
     for (int i = 0; i < map->bucket_list_capacity; i++) {
         Bucket *bucket = map->bucket_list + i;
         if (bucket->value) {
+            free(bucket->key);
             free(bucket->value);
         }
 
         Bucket *collision_node_iter = bucket->collision_head;
         while (collision_node_iter) {
             Bucket *next_collision_node = collision_node_iter->next;
+            free(collision_node_iter->key);
             free(collision_node_iter->value);
             free(collision_node_iter);
 
@@ -125,7 +137,7 @@ static Bucket *map_find_free_bucket(Map *map, char const *key) {
 
 static void map_reallocate_buckets_if_needed(Map *map) {
     if (map->load_factor >= 1.0f) {
-        Bucket *new_bucket_list = realloc(map->bucket_list, map->bucket_list_capacity);
+        Bucket *new_bucket_list = realloc(map->bucket_list, map->bucket_list_capacity * 1.5);
         map->bucket_list_capacity *= 1.5;
         map->bucket_list = new_bucket_list;
         map->load_factor = 0.0f;
@@ -135,10 +147,9 @@ static void map_reallocate_buckets_if_needed(Map *map) {
 void map_insert(Map *map, char const *key, Any value) {
     if (map->locked)
         return;
-
     map_reallocate_buckets_if_needed(map);
     Bucket *bucket = map_find_free_bucket(map, key);
-    bucket->key = key;
+    bucket->key = string_duplicate(key);
     bucket->value = malloc(map->value_size);
     memcpy(bucket->value, value, map->value_size);
     bucket->in_use = true;
@@ -149,10 +160,9 @@ void map_insert(Map *map, char const *key, Any value) {
 void map_insert_array(Map *map, char const *key, Any array, int count) {
     if (map->locked)
         return;
-
     map_reallocate_buckets_if_needed(map);
     Bucket *bucket = map_find_free_bucket(map, key);
-    bucket->key = key;
+    bucket->key = string_duplicate(key);
     bucket->value = malloc(map->value_size * count);
     memcpy(bucket->value, array, map->value_size * count);
     bucket->in_use = true;
@@ -188,6 +198,8 @@ Any map_get(Map *map, char const *key) {
 }
 
 void map_remove(Map *map, char const *key) {
+    if (map->locked)
+        return;
     size_t index = hash_function(key) % map->bucket_list_capacity;
     Bucket *bucket = map->bucket_list + index;
     Bucket *bucket_to_remove = NULLPTR;
@@ -217,6 +229,7 @@ void map_remove(Map *map, char const *key) {
     }
 
     if (bucket_to_remove) {
+        free(bucket_to_remove->key);
         bucket_to_remove->key = NULLPTR;
         free(bucket_to_remove->value);
         bucket_to_remove->value = NULLPTR;
@@ -228,7 +241,10 @@ void map_remove(Map *map, char const *key) {
         if (is_collision_node) {
             Bucket *next_node = bucket_to_remove->next;
             free(bucket_to_remove);
-            bucket->collision_head = next_node;
+            if (previous_node == bucket)
+                bucket->collision_head = next_node;
+            else
+                previous_node->next = next_node;
         }
     }
 }
@@ -238,14 +254,14 @@ Map_Iter *map_iter_begin(Map *map) {
     map->locked = true;
     map->iter.key = NULLPTR;
     map->iter.value = ANY_NULL;
-    map->current_collision_node = NULL;
+    map->current_collision_node = NULLPTR;
     return map_iter_next(map);
 }
 
 Map_Iter *map_iter_next(Map *map) {
     Bucket *bucket_to_return = NULLPTR;
-    map->iter.key = NULL;
-    map->iter.value = NULL;
+    map->iter.key = NULLPTR;
+    map->iter.value = ANY_NULL;
     while (map->iter_position < map->bucket_list_capacity) {
         Bucket *bucket = map->bucket_list + map->iter_position;
 
@@ -261,9 +277,8 @@ Map_Iter *map_iter_next(Map *map) {
             if (bucket->in_use)
                 bucket_to_return = bucket;
 
-            if (bucket->collision_head) {
+            if (bucket->collision_head)
                 map->current_collision_node = bucket->collision_head;
-            }
 
             if (!map->current_collision_node)
                 map->iter_position++;
@@ -273,9 +288,9 @@ Map_Iter *map_iter_next(Map *map) {
             map->iter.key = bucket_to_return->key;
             map->iter.value = bucket_to_return->value;
             map->iter.is_array = bucket_to_return->is_array;
-            if (map->iter.is_array) {
+            map->iter.count = 0;
+            if (map->iter.is_array)
                 map->iter.count = bucket_to_return->count;
-            }
             break;
         }
     }
