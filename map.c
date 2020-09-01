@@ -127,7 +127,7 @@ static Bucket *map_find_free_bucket(Map *map, char const *key) {
             bucket->collision_head = next_collision_node;
         bucket->last_collision_node = next_collision_node;
         bucket = next_collision_node;
-        map->load_factor += 0.1f;
+        map->load_factor = map->bucket_list_count / map->bucket_list_capacity;
     }
 
     map->bucket_list_count++;
@@ -136,11 +136,11 @@ static Bucket *map_find_free_bucket(Map *map, char const *key) {
 }
 
 static void map_reallocate_buckets_if_needed(Map *map) {
+    /* This threshhold is the same as C#'s HashMap */
     if (map->load_factor >= 1.0f) {
         Bucket *new_bucket_list = realloc(map->bucket_list, map->bucket_list_capacity * 1.5);
         map->bucket_list_capacity *= 1.5;
         map->bucket_list = new_bucket_list;
-        map->load_factor = 0.0f;
     }
 }
 
